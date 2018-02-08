@@ -11,8 +11,9 @@ from google.cloud import speech
 from google.cloud.speech import enums
 from google.cloud.speech import types
 from google.gax import BackoffSettings
-from naoqi_bridge_msgs.msg import AudioBuffer
+from naoqi_bridge_msgs.msg import AudioBuffer, HeadTouch
 from mummer_asr.msg import MummerAsr
+from std_srvs.srv import Empty, EmptyResponse
 import numpy as np
 import signal
 import sys
@@ -26,6 +27,9 @@ class AudioStream(object):
     def __init__(self, name, rate, chunk):
         rospy.loginfo("Starting {}.".format(name))
         rospy.Subscriber("/noise_filter_node/result", AudioBuffer, self.callback, queue_size=1)
+        rospy.Service('~pause', Empty, self.pause)
+        rospy.Service('~resume', Empty, self.resume)
+        # rospy.Subscriber("/naoqi_driver_node/head_touch", HeadTouch, self.resume, queue_size=1)
 
         self.publisher = rospy.Publisher("~result", MummerAsr, queue_size=1)
 
@@ -34,6 +38,7 @@ class AudioStream(object):
         # Create a thread-safe buffer of audio data
         self._buff = queue.Queue()
         self.closed = True
+        self.exit = False
 
         self.rate = rate
         self.chunk = chunk
@@ -50,8 +55,8 @@ class AudioStream(object):
 
     def callback(self, msg):
         c = np.array(msg.data, dtype=np.int16)
-        # print c.shape
-        self._buff.put(c.tobytes())
+        if not self.closed:
+            self._buff.put(c.tobytes())
 
     def generator(self):
         while not self.closed:
@@ -138,15 +143,35 @@ class AudioStream(object):
                 msg.confidence = str(result.alternatives[0].confidence)
                 self.publisher.publish(msg)
 
+                ##############################################
+                # End-Of-Speech detection goes here.
+                # For now it's just the recognized word "stop"
+                ##############################################
+                # if re.search(r'\b(exit|quit|stop)\b', transcript, re.I):
+                #     print('End of speech detected..')
+                #
+                #     self.pause(msg)
+
+    def pause(self, msg):
+        # msg.end_of_speech = True
+        # self.publisher.publish(msg)
+        self.closed = True
+        self._buff.put(None)
+        return EmptyResponse()
+
+    def resume(self, req):
+        self.closed = False
+        return EmptyResponse()
+
     def signal_handler(self, signal, frame):
         print('You pressed Ctrl+C!')
         self.closed = True
+        self._buff.put(None)
+        self.exit = True
 
 
 if __name__ == "__main__":
-    rospy.init_node("audio_stream")
-
-    # a = AudioStream(rospy.get_name(), RATE, CHUNK)
+    rospy.init_node("mummer_asr")
     language_code = 'en-US'  # a BCP-47 language tag
 
     client = speech.SpeechClient()
@@ -162,11 +187,13 @@ if __name__ == "__main__":
         config=config,
         interim_results=True,
         single_utterance=False)
-    # BackoffSettings.total_timeout_millis = 200
 
     with AudioStream(rospy.get_name(), RATE, CHUNK) as a:
         signal.signal(signal.SIGINT, a.signal_handler)
         startTime = rospy.Time.now()
-        responses = client.streaming_recognize(streaming_config, a.generator())
-        a.listen_print_loop(responses)
+
+        while not a.exit:
+            if not a.closed:
+                responses = client.streaming_recognize(streaming_config, a.generator())
+                a.listen_print_loop(responses)
 
