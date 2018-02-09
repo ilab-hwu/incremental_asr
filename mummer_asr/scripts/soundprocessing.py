@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import re
-
 import rospy
 import sys
 
@@ -10,7 +8,6 @@ from future.moves import queue
 from google.cloud import speech
 from google.cloud.speech import enums
 from google.cloud.speech import types
-from google.gax import BackoffSettings
 from naoqi_bridge_msgs.msg import AudioBuffer, HeadTouch
 from mummer_asr.msg import MummerAsr
 from std_srvs.srv import Empty, EmptyResponse
