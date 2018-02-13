@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import rospy
 import sys
-
 import time
 from future.moves import queue
 from google.cloud import speech
@@ -13,7 +12,6 @@ from mummer_asr.msg import MummerAsr
 from std_srvs.srv import Empty, EmptyResponse
 import numpy as np
 import signal
-import sys
 
 # Audio recording parameters
 RATE = 48000
@@ -137,7 +135,7 @@ class AudioStream(object):
                 print "confidence: ", str(result.alternatives[0].confidence)
                 num_chars_printed = 0
                 msg.final = transcript + overwrite_chars
-                msg.confidence = str(result.alternatives[0].confidence)
+                msg.confidence = result.alternatives[0].confidence
                 self.publisher.publish(msg)
 
                 ##############################################
@@ -152,11 +150,13 @@ class AudioStream(object):
     def pause(self, msg):
         # msg.end_of_speech = True
         # self.publisher.publish(msg)
+        rospy.loginfo("ASR PAUSED")
         self.closed = True
         self._buff.put(None)
         return EmptyResponse()
 
     def resume(self, req):
+        rospy.loginfo("ASR RESUMED")
         self.closed = False
         return EmptyResponse()
 
@@ -189,8 +189,12 @@ if __name__ == "__main__":
         signal.signal(signal.SIGINT, a.signal_handler)
         startTime = rospy.Time.now()
 
+        # Initial state TODO: make it into a ros launch parameter??
+        a.closed = True
+
         while not a.exit:
             if not a.closed:
+                rospy.loginfo("Listening")
                 responses = client.streaming_recognize(streaming_config, a.generator())
                 a.listen_print_loop(responses)
 

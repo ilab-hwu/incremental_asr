@@ -1,4 +1,4 @@
 Header header
 string incremental
 string final
-string confidence
+float64 confidence
