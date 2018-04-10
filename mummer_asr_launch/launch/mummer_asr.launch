@@ -1,0 +1,7 @@
+<launch>
+
+  <include file="$(find noise_filter)/launch/noise_filter.launch"/>
+  <node name="mummer_asr" pkg="mummer_asr" type="soundprocessing.py" output="screen" respawn="true"/>
+  <node name="end_of_speech" pkg="end_of_speech" type="end_of_speech_node.py" output="screen" respawn="true"/>
+
+</launch>
