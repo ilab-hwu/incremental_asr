@@ -196,5 +196,9 @@ if __name__ == "__main__":
             if not a.closed:
                 rospy.loginfo("Listening")
                 responses = client.streaming_recognize(streaming_config, a.generator())
-                a.listen_print_loop(responses)
+                try:
+                    a.listen_print_loop(responses)
+                except Exception as e:
+                    print e
+                    continue
 
