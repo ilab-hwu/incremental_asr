@@ -8,6 +8,7 @@ from google.cloud import speech
 from google.cloud.speech import enums
 from google.cloud.speech import types
 from naoqi_bridge_msgs.msg import AudioBuffer, HeadTouch
+from audio_common_msgs.msg import AudioData
 from mummer_asr.msg import MummerAsr
 from std_srvs.srv import Empty, EmptyResponse
 import numpy as np
@@ -15,13 +16,13 @@ import signal
 
 # Audio recording parameters
 RATE = 48000
-CHUNK = int(RATE / 10)  # 100ms
+CHUNK = RATE #int(RATE / 10)  # 100ms
 
 
 class AudioStream(object):
     def __init__(self, name, rate, chunk):
         rospy.loginfo("Starting {}.".format(name))
-        rospy.Subscriber("/noise_filter_node/result", AudioBuffer, self.callback, queue_size=1)
+        rospy.Subscriber("/audio/audio", AudioData, self.callback, queue_size=1)
         rospy.Service('~pause', Empty, self.pause)
         rospy.Service('~resume', Empty, self.resume)
         # rospy.Subscriber("/naoqi_driver_node/head_touch", HeadTouch, self.resume, queue_size=1)
@@ -49,9 +50,10 @@ class AudioStream(object):
         self._buff.put(None)
 
     def callback(self, msg):
-        c = np.array(msg.data, dtype=np.int16)
-        if not self.closed:
-            self._buff.put(c.tobytes())
+        # c = np.array(msg.data, dtype=np.int16)
+        # if not self.closed:
+            # self._buff.put(c.tobytes())
+            self._buff.put(msg.data)
 
     def generator(self):
         while not self.closed:
