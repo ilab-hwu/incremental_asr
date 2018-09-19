@@ -1,7 +1,17 @@
 <launch>
 
+  <arg name="target_language" default="en-UK"/>
+
   <include file="$(find noise_filter)/launch/noise_filter.launch"/>
-  <node name="mummer_asr" pkg="mummer_asr" type="soundprocessing.py" output="screen" respawn="true"/>
-  <node name="end_of_speech" pkg="end_of_speech" type="end_of_speech_node.py" output="screen" respawn="true"/>
+  <node ns="asr1" name="mummer_asr" pkg="mummer_asr" type="soundprocessing.py" output="screen" respawn="true">
+    <param name="target_language" type="string" value="$(arg target_language)"/>
+    <param name="topic" type="string" value="/my_awesome_sound/result0"/>
+  </node>
+  <node ns="asr2" name="mummer_asr" pkg="mummer_asr" type="soundprocessing.py" output="screen" respawn="true">
+    <param name="target_language" type="string" value="$(arg target_language)"/>
+    <param name="topic" type="string" value="/my_awesome_sound/result1"/>
+  </node>
+  <node ns="asr1" name="end_of_speech" pkg="end_of_speech" type="end_of_speech_node.py" output="screen" respawn="true"/>
+  <node ns="asr2" name="end_of_speech" pkg="end_of_speech" type="end_of_speech_node.py" output="screen" respawn="true"/>
 
 </launch>

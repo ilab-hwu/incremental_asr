@@ -5,14 +5,16 @@ import rospy
 from mummer_asr.msg import MummerAsr
 from naoqi_bridge_msgs.msg import AudioBuffer
 from end_of_speech.msg import EndOfSpeech
+from std_msgs.msg import String
 
-SILENCE_THRESHOLD = 2
+SILENCE_THRESHOLD = 0.5
 
 class EndOfSpeech_node(object):
     def __init__(self):
-        rospy.Subscriber("/mummer_asr/result", MummerAsr, self.callback, queue_size=1)
+        rospy.Subscriber("mummer_asr/result", MummerAsr, self.callback, queue_size=1)
         self.sub = rospy.Subscriber("/noise_filter_node/result", AudioBuffer, self.audio_received, queue_size=1)
         self.pub = rospy.Publisher("~eos", EndOfSpeech, queue_size=1)
+        self.pub2 = rospy.Publisher("/human_dialogue", String, queue_size=1)
         self.output = None
         self.last_end_time = 0
         self.audio_stamp = 0
@@ -40,6 +42,10 @@ class EndOfSpeech_node(object):
                 rospy.loginfo("Final utterance is '%s' with '%f' confidence" % (eos_msg.final_utterance, eos_msg.confidence))
 
             self.pub.publish(eos_msg)
+            try:
+                self.pub2.publish(eos_msg.final_utterance)
+            except:
+                print "Publish error"
             self.sub.unregister()
             self.sub = None
         else:

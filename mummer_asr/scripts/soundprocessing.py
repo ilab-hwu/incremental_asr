@@ -21,7 +21,7 @@ CHUNK = int(RATE / 10)  # 100ms
 class AudioStream(object):
     def __init__(self, name, rate, chunk):
         rospy.loginfo("Starting {}.".format(name))
-        rospy.Subscriber("/noise_filter_node/result", AudioBuffer, self.callback, queue_size=1)
+        rospy.Subscriber(rospy.get_param("~topic"), AudioBuffer, self.callback, queue_size=1)
         rospy.Service('~pause', Empty, self.pause)
         rospy.Service('~resume', Empty, self.resume)
         # rospy.Subscriber("/naoqi_driver_node/head_touch", HeadTouch, self.resume, queue_size=1)
@@ -169,7 +169,7 @@ class AudioStream(object):
 
 if __name__ == "__main__":
     rospy.init_node("mummer_asr")
-    language_code = 'en-US'  # a BCP-47 language tag
+    language_code = rospy.get_param("~target_language", 'en-UK')  # a BCP-47 language tag
 
     client = speech.SpeechClient()
     # TODO add speech context with keywords from vocabulary
