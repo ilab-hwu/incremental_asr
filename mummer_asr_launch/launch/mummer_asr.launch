@@ -1,17 +1,25 @@
 <launch>
 
   <arg name="target_language" default="en-UK"/>
+  <arg name="use_extra_mic" default="false"/>
 
-  <include file="$(find noise_filter)/launch/noise_filter.launch"/>
-  <node ns="asr1" name="mummer_asr" pkg="mummer_asr" type="soundprocessing.py" output="screen" respawn="true">
-    <param name="target_language" type="string" value="$(arg target_language)"/>
-    <param name="topic" type="string" value="/my_awesome_sound/result0"/>
-  </node>
-  <node ns="asr2" name="mummer_asr" pkg="mummer_asr" type="soundprocessing.py" output="screen" respawn="true">
-    <param name="target_language" type="string" value="$(arg target_language)"/>
-    <param name="topic" type="string" value="/my_awesome_sound/result1"/>
-  </node>
-  <node ns="asr1" name="end_of_speech" pkg="end_of_speech" type="end_of_speech_node.py" output="screen" respawn="true"/>
-  <node ns="asr2" name="end_of_speech" pkg="end_of_speech" type="end_of_speech_node.py" output="screen" respawn="true"/>
+  <group if="$(arg use_extra_mic)">
+      <node name="microphone_grabber" pkg="mummer_asr" type="microphone_grabber.py" output="screen" respawn="true"/>
+      <node name="noise_filter_node" pkg="noise_filter" type="noise_filter_node.py" output="screen" respawn="true">
+            <param name="topic" type="string" value="/microphone_grabber/result"/>
+      </node>
+      <node name="mummer_asr" pkg="mummer_asr" type="soundprocessing.py" output="screen" respawn="true">
+            <param name="target_language" type="string" value="$(arg target_language)"/>
+      </node>
+      <node name="end_of_speech" pkg="end_of_speech" type="end_of_speech_node.py" output="screen" respawn="true"/>
+  </group>
+
+  <group unless="$(arg use_extra_mic)">
+      <include file="$(find noise_filter)/launch/noise_filter.launch"/>
+      <node name="mummer_asr" pkg="mummer_asr" type="soundprocessing.py" output="screen" respawn="true">
+            <param name="target_language" type="string" value="$(arg target_language)"/>
+      </node>
+      <node name="end_of_speech" pkg="end_of_speech" type="end_of_speech_node.py" output="screen" respawn="true"/>
+  </group>
 
 </launch>

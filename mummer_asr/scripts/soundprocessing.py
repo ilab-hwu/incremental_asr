@@ -21,7 +21,7 @@ CHUNK = int(RATE / 10)  # 100ms
 class AudioStream(object):
     def __init__(self, name, rate, chunk):
         rospy.loginfo("Starting {}.".format(name))
-        rospy.Subscriber(rospy.get_param("~topic"), AudioBuffer, self.callback, queue_size=1)
+        rospy.Subscriber(rospy.get_param("~topic", "noise_filter_node/result"), AudioBuffer, self.callback, queue_size=1)
         rospy.Service('~pause', Empty, self.pause)
         rospy.Service('~resume', Empty, self.resume)
         # rospy.Subscriber("/naoqi_driver_node/head_touch", HeadTouch, self.resume, queue_size=1)
