@@ -24,6 +24,8 @@ class AudioStream(object):
         rospy.Subscriber(rospy.get_param("~topic", "noise_filter_node/result"), AudioBuffer, self.callback, queue_size=1)
         rospy.Service('~pause', Empty, self.pause)
         rospy.Service('~resume', Empty, self.resume)
+        rospy.Service('~stop', Empty, self.stop_asr)
+        rospy.Service('~start', Empty, self.start_asr)
         # rospy.Subscriber("/naoqi_driver_node/head_touch", HeadTouch, self.resume, queue_size=1)
 
         self.publisher = rospy.Publisher("~result", MummerAsr, queue_size=1)
@@ -33,6 +35,7 @@ class AudioStream(object):
         # Create a thread-safe buffer of audio data
         self._buff = queue.Queue()
         self.closed = True
+        self.running = True
         self.exit = False
 
         self.rate = rate
@@ -133,6 +136,7 @@ class AudioStream(object):
             else:
                 print (transcript + overwrite_chars)
                 print "confidence: ", str(result.alternatives[0].confidence)
+                #print 'alternatives: {}'.format(result.alternatives)
                 num_chars_printed = 0
                 msg.final = transcript + overwrite_chars
                 msg.confidence = result.alternatives[0].confidence
@@ -160,6 +164,18 @@ class AudioStream(object):
         self.closed = False
         return EmptyResponse()
 
+    def start_asr(self, req):
+        rospy.loginfo("ASR STARTED")
+        self.running = True
+        self._buff.put(None)
+        return EmptyResponse()
+
+    def stop_asr(self, req):
+        rospy.loginfo("ASR STOPPED")
+        self.running = False
+        self._buff.put(None)
+        return EmptyResponse()
+
     def signal_handler(self, signal, frame):
         print('You pressed Ctrl+C!')
         self.closed = True
@@ -176,9 +192,10 @@ if __name__ == "__main__":
     config = types.RecognitionConfig(
         encoding=enums.RecognitionConfig.AudioEncoding.LINEAR16,
         sample_rate_hertz=RATE,
+        max_alternatives=5,
         language_code=language_code,
         speech_contexts=[speech.types.SpeechContext(
-            phrases=['Ioannis Papaioannou'])],
+            phrases=['123 Tuulilasi Ideapark', 'ABC asema', 'Aitoleipä', 'Aleksi 13', 'Alko', 'Apteekki Ideapark', 'Arnolds', 'Avain- ja suutarityö Helsky', 'Ballot', 'Beefking Steakhouse', 'Bella Roma', 'Bik Bok', 'Björn Borg', 'BR Lelut', 'Brothers', 'Budget Sport', 'BURGER KING', 'Cafe Delisa, Liisan Leipomo', 'Cafe Linkosuo Autoareena', 'Carlings', 'CHANGE Lingerie', 'Clas Ohlson', 'Click Shoes', 'Coyote Bar & Grill', 'Cubus', 'Daddys Diner', 'Digiman', 'DinSko', 'Dna Kauppa Oy', 'Dressmann', 'Dressmann XL', 'EasyFit Ideapark', 'Elisan Myyntipiste', 'Emotion', 'Esprit', 'Eurokangas', 'Farkkujen Tehtaanmyymälä', 'Faunatar', 'Fifi et Fido', 'Finnlandia Kalustemaailma', 'Flying Tiger Copenhagen', 'Fonum', 'Fortum', 'Gant', 'Gerry Weber', 'Gina Tricot', 'Glitter', 'Guess Outlet', 'H&M', 'Hairlekiini', 'Halonen', 'Hemtex', 'Hesburger', 'Hiustalo Outlet', 'Hoitola Manna', 'Hovikebab', 'Ideapesu', 'ideaPrint', 'Iittala outlet Lempäälä', 'Ilopilleri', 'Infopiste', 'Instrumentarium', 'Intersport Ideapark', 'It’s Pure Ideapark Lempäälä', 'Jack & Jones', 'Jesper Junior', 'Juvesport', 'Kalastus-Suomi', 'Kamux', 'KappAhl', 'Kauneus- ja jalkahoitopalvelu SK', 'Kauppahuone Riveri', 'Kicks', 'Kirjapörssi', 'KOOKENKÄ', 'Kotipizza', 'Kristyle', 'Kukka & puutarhakauppa Mäkelä TULOSSA', 'Kukka Kesäpiha', 'Kultajousi', 'Kultatukku', 'Kulttuurikeskus PiiPoo', 'Lagoon Fish Foot Spa', 'Life', 'LINDA MODE', 'Lindex', 'Linkosuo Cafe', 'LUMO-puoti', 'LähiTapiola', 'Mango', 'Marc O’Polo', 'Marimekko Outlet', 'Maskun Kalustetalo', 'Minimani', 'Mje-Fix Oy', 'Mobila', 'Mummola Lahjapuoti', 'Musti ja Mirri', 'MyBag', 'Name It', 'Netrauta.fi', 'New Hairstore', 'New Yorker', 'Nissen', 'Nordea Ideapark', 'NP', 'Oma Säästöpankki', 'Partioaitta', 'Pelaamo', 'Pentik', 'Pirkanmaan FysioCenter', 'Pirkanmaan Tanssiopisto', 'Power', 'Prisma', 'Prisma Ideapark parturi-kampaamo', 'Pukimo', 'Ravintola Pancho Villa', 'Rax Buffet', 'Reima', 'Rils', 'Rolls Express', 'Saunalahti Ideapark', 'Shoe House', 'Sievi Shop', 'Sinelli', 'Spice Ice', 'Stadium', 'Sticky Wingers', 'Ståhlberg Home Bakery & Cafe', 'Subway', 'SunWok', 'Suomalainen Kirjakauppa', 'Suomen Kultapörssi', 'Superdry', 'Swamp', 'Talenom', 'Teknikmagasinet', 'Telia Kauppa', 'Thai Papaya', 'The Body Shop', 'Ti-Ti Nallen Koti', 'Timanttiset', 'Tommy Hilfiger', 'Top Sport', 'Toys R US', 'Unikulma', 'Ur & Penn', 'Vaihtoplus', 'Vero Moda', 'Vila', 'Your Face', 'Zizzi', 'Zones by Särkänniemi'])],
         )
     streaming_config = types.StreamingRecognitionConfig(
         config=config,
@@ -193,7 +210,7 @@ if __name__ == "__main__":
         a.closed = True
 
         while not a.exit:
-            if not a.closed:
+            if not a.closed and a.running:
                 rospy.loginfo("Listening")
                 responses = client.streaming_recognize(streaming_config, a.generator())
                 try:

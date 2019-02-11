@@ -15,6 +15,7 @@ class Sound(object):
 
     def callback(self, indata, frames, time, status):
         # print frames, time, status
+        indata = Sound.sum_channels(indata, 2)
         data = indata.flatten()
         self.buffer.extend(data.tolist())
         if len(self.buffer) >= self.chunk:
@@ -27,8 +28,12 @@ class Sound(object):
             self.buffer = self.buffer[self.chunk:]
 
     def run(self):
-        with sd.InputStream(channels=1, samplerate=self.rate, dtype='int16', callback=self.callback):
+        with sd.InputStream(channels=2, samplerate=self.rate, dtype='int16', callback=self.callback):
            rospy.spin()
+
+    @staticmethod
+    def sum_channels(data, num_mics):
+        return np.sum(data, axis=1, dtype=np.int) / num_mics
 
 if __name__ == "__main__":
     rospy.init_node("microphone_grabber")

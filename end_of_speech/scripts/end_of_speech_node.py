@@ -7,7 +7,7 @@ from naoqi_bridge_msgs.msg import AudioBuffer
 from end_of_speech.msg import EndOfSpeech
 from std_msgs.msg import String
 
-SILENCE_THRESHOLD = 0.5
+SILENCE_THRESHOLD = 0.1
 
 class EndOfSpeech_node(object):
     def __init__(self):
