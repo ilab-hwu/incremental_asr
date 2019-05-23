@@ -6,8 +6,9 @@ from mummer_asr.msg import MummerAsr
 from naoqi_bridge_msgs.msg import AudioBuffer
 from end_of_speech.msg import EndOfSpeech
 from std_msgs.msg import String
+from std_srvs.srv import Empty, EmptyRequest
 
-SILENCE_THRESHOLD = 0.1
+SILENCE_THRESHOLD = 3.0
 
 class EndOfSpeech_node(object):
     def __init__(self):
@@ -17,6 +18,7 @@ class EndOfSpeech_node(object):
         self.pub2 = rospy.Publisher("/human_dialogue", String, queue_size=1)
         self.output = None
         self.last_end_time = 0
+        self.last_asr = None
         self.audio_stamp = 0
         self._google_utt_buff = []
         self._google_conf_buff = []
@@ -25,6 +27,7 @@ class EndOfSpeech_node(object):
         if self.sub is None:
             self.sub = rospy.Subscriber("/noise_filter_node/result", AudioBuffer, self.audio_received, queue_size=1)
         self.last_end_time = msg.header.stamp.secs
+        self.last_asr = msg
         if msg.final != '':
             self._google_utt_buff.append(msg.final)
         rospy.loginfo(msg.confidence)
@@ -35,8 +38,12 @@ class EndOfSpeech_node(object):
         eos_msg = EndOfSpeech()
         self.audio_stamp = msg.header.stamp.secs
 
-        if (not self.audio_stamp - self.last_end_time <= SILENCE_THRESHOLD) and (not self.last_end_time == 0):
+        if self.audio_stamp - self.last_end_time > SILENCE_THRESHOLD and self.last_end_time != 0:
+            eos_msg.header = self.last_asr.header
             eos_msg.final_utterance, eos_msg.confidence = self.create_final_utterance()
+            if eos_msg.final_utterance == '':
+                rospy.logwarn("!No final message from google. Using incremental result.!")
+                eos_msg.final_utterance += self.last_asr.incremental
             print "FINAL", eos_msg.final_utterance
             if eos_msg.confidence > 0.:
                 rospy.loginfo("Final utterance is '%s' with '%f' confidence" % (eos_msg.final_utterance, eos_msg.confidence))
@@ -48,8 +55,6 @@ class EndOfSpeech_node(object):
                 print "Publish error"
             self.sub.unregister()
             self.sub = None
-        else:
-            pass
 
     def create_final_utterance(self):
         avg_conf = sum(self._google_conf_buff) / len(self._google_conf_buff) if \
@@ -58,6 +63,20 @@ class EndOfSpeech_node(object):
         self._google_utt_buff = []
         self._google_conf_buff = []
         return utterance.strip(), avg_conf
+
+    def call_service(self, srv_name, srv_type, req):
+        while not rospy.is_shutdown():
+            try:
+                s = rospy.ServiceProxy(
+                    srv_name,
+                    srv_type
+                )
+                s.wait_for_service(timeout=1.)
+            except rospy.ROSException:
+                rospy.logwarn("Could not communicate with '%s' service. Retrying in 1 second." % srv_name)
+                rospy.sleep(1.)
+            else:
+                return s(req)
 
 
 if __name__ == '__main__':
