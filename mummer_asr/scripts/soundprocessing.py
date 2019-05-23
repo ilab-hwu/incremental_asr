@@ -12,6 +12,7 @@ from mummer_asr.msg import MummerAsr
 from std_srvs.srv import Empty, EmptyResponse
 import numpy as np
 import signal
+from threading import Thread
 
 # Audio recording parameters
 RATE = 48000
@@ -37,6 +38,7 @@ class AudioStream(object):
         self.closed = True
         self.running = True
         self.exit = False
+        self.timer_thread = None
 
         self.rate = rate
         self.chunk = chunk
@@ -50,6 +52,10 @@ class AudioStream(object):
         # Signal the generator to terminate so that the client's
         # streaming_recognize method will not block the process termination.
         self._buff.put(None)
+
+    def timer(self):
+        rospy.sleep(30.)
+        rospy.logwarn("1 minute")
 
     def callback(self, msg):
         c = np.array(msg.data, dtype=np.int16)
@@ -102,6 +108,11 @@ class AudioStream(object):
         for response in responses:
             if rospy.is_shutdown():
                 return
+
+            if response.speech_event_type == 1:
+                rospy.logwarn("!Restarting ASR stream!")
+                self._buff.put(None)
+
             if not response.results:
                 continue
 
@@ -109,7 +120,6 @@ class AudioStream(object):
             # the first result being considered, since once it's `is_final`, it
             # moves on to considering the next utterance.
             result = response.results[0]
-            # print "[EVENT] ", response.speech_event_type
             if not result.alternatives:
                 continue
 
@@ -130,8 +140,9 @@ class AudioStream(object):
                 sys.stdout.write(transcript + overwrite_chars + '\r')
                 sys.stdout.flush()
                 msg.incremental = transcript + overwrite_chars
-                self.publisher.publish(msg)
-                num_chars_printed = len(transcript)
+                if not self.closed and self.running:
+                    self.publisher.publish(msg)
+                    num_chars_printed = len(transcript)
 
             else:
                 print (transcript + overwrite_chars)
@@ -140,7 +151,8 @@ class AudioStream(object):
                 num_chars_printed = 0
                 msg.final = transcript + overwrite_chars
                 msg.confidence = result.alternatives[0].confidence
-                self.publisher.publish(msg)
+                if not self.closed and self.running:
+                    self.publisher.publish(msg)
 
                 ##############################################
                 # End-Of-Speech detection goes here.
@@ -162,6 +174,8 @@ class AudioStream(object):
     def resume(self, req):
         rospy.loginfo("ASR RESUMED")
         self.closed = False
+        # self.timer_thread = Thread(target=self.timer)
+        # self.timer_thread.start()
         return EmptyResponse()
 
     def start_asr(self, req):
@@ -200,7 +214,7 @@ if __name__ == "__main__":
     streaming_config = types.StreamingRecognitionConfig(
         config=config,
         interim_results=True,
-        single_utterance=False)
+        single_utterance=True)
 
     with AudioStream(rospy.get_name(), RATE, CHUNK) as a:
         signal.signal(signal.SIGINT, a.signal_handler)
