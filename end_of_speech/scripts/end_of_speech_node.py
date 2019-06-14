@@ -8,7 +8,7 @@ from end_of_speech.msg import EndOfSpeech
 from std_msgs.msg import String
 from std_srvs.srv import Empty, EmptyRequest
 
-SILENCE_THRESHOLD = 3.0
+SILENCE_THRESHOLD = 2.0
 
 class EndOfSpeech_node(object):
     def __init__(self):
@@ -44,6 +44,7 @@ class EndOfSpeech_node(object):
             if eos_msg.final_utterance == '':
                 rospy.logwarn("!No final message from google. Using incremental result.!")
                 eos_msg.final_utterance += self.last_asr.incremental
+                eos_msg.confidence = 1.0
             print "FINAL", eos_msg.final_utterance
             if eos_msg.confidence > 0.:
                 rospy.loginfo("Final utterance is '%s' with '%f' confidence" % (eos_msg.final_utterance, eos_msg.confidence))
