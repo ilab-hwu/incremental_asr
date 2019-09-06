@@ -22,6 +22,22 @@ class EndOfSpeech_node(object):
         self.audio_stamp = 0
         self._google_utt_buff = []
         self._google_conf_buff = []
+        self.__is_alive()
+
+    def __is_alive(self):
+        from threading import Thread
+        from std_msgs.msg import String
+
+        pub = rospy.Publisher("~is_alive", String, queue_size=1)
+
+        def publish():
+            r = rospy.Rate(1)
+            while not rospy.is_shutdown():
+                pub.publish(str(rospy.Time.now().to_sec()))
+                r.sleep()
+
+        t = Thread(target=publish)
+        t.start()
 
     def callback(self, msg):
         if self.sub is None:

@@ -42,6 +42,22 @@ class AudioStream(object):
 
         self.rate = rate
         self.chunk = chunk
+        self.__is_alive()
+
+    def __is_alive(self):
+        from threading import Thread
+        from std_msgs.msg import String
+
+        pub = rospy.Publisher("~is_alive", String, queue_size=1)
+
+        def publish():
+            r = rospy.Rate(1)
+            while not rospy.is_shutdown():
+                pub.publish(str(rospy.Time.now().to_sec()))
+                r.sleep()
+
+        t = Thread(target=publish)
+        t.start()
 
     def __enter__(self):
         self.closed = False
