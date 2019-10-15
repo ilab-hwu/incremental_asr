@@ -7,12 +7,15 @@ from future.moves import queue
 from google.cloud import speech
 from google.cloud.speech import enums
 from google.cloud.speech import types
+from google.api_core.exceptions import *
 from naoqi_bridge_msgs.msg import AudioBuffer, HeadTouch
 from mummer_asr.msg import MummerAsr
+from naoqi_bridge_msgs.msg import AudioBuffer
 from std_srvs.srv import Empty, EmptyResponse
 import numpy as np
 import signal
 from threading import Thread
+from subprocess import Popen, PIPE, call
 
 # Audio recording parameters
 RATE = 48000
@@ -79,7 +82,7 @@ class AudioStream(object):
             self._buff.put(c.tobytes())
 
     def generator(self):
-        while not self.closed:
+        while not self.closed and not rospy.is_shutdown():
             if rospy.is_shutdown():
                 return
             # Use a blocking get() to ensure there's at least one chunk of
@@ -212,6 +215,23 @@ class AudioStream(object):
         self._buff.put(None)
         self.exit = True
 
+    def kill_naoqi(self):
+        rospy.logwarn("Restarting naoqi driver")
+        p = Popen(['pgrep', 'naoqi_driver'], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        out, _ = p.communicate()
+        for x in out.split("\n"):
+            if len(x):
+                rospy.logwarn("Restarting process with ID: {}".format(x))
+                call(["kill", "-9", x])
+        rospy.logwarn("Waiting for naoqi driver to restart")
+        rospy.sleep(5.)
+        rospy.wait_for_message("/naoqi_driver_node/audio", AudioBuffer)
+        rospy.loginfo("Naoqi driver has restarted. Triggering pause and resume")
+        self.pause("None")
+        rospy.sleep(1.)
+        self.resume("None")
+        rospy.loginfo("Hopefully it works again now.")
+
 
 if __name__ == "__main__":
     rospy.init_node("mummer_asr")
@@ -239,14 +259,18 @@ if __name__ == "__main__":
         # Initial state TODO: make it into a ros launch parameter??
         a.closed = True
 
-        while not a.exit:
+        while not a.exit and not rospy.is_shutdown():
             if not a.closed and a.running:
                 rospy.loginfo("Listening")
                 responses = client.streaming_recognize(streaming_config, a.generator())
                 try:
                     a.listen_print_loop(responses)
+                except OutOfRange as e:
+                    rospy.logerr("ERROR '{}': {}".format(type(e), e))
+                    a.kill_naoqi()
+                    continue
                 except Exception as e:
-                    print e
+                    rospy.logwarn("ERROR '{}': {}".format(type(e), e))
                     continue
             else:
                 time.sleep(0.01)
